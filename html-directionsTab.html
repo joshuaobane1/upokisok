@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTU Map Kiosk</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f2f2f2; /* Change background color to gray */
+            font-family: Arial, sans-serif;
+        }
+        .map-overlay {
+            top: -1px;
+            left: -1px;
+            z-index: 1;
+            background-color: white;
+            padding: 30px;
+            border-radius: 30px; /* Apply curved border radius */
+            box-shadow: 10px 10px 10px rgba(0, 0, 0, 0.1);
+            width: 310px; /* Adjust the width of the search tab */
+            max-width: calc(100% - 20px); /* Limit maximum width */
+            display: flex; /* Use flexbox for layout */
+            align-items: center; /* Center items vertically */
+            flex-direction: column; /* Align items in a column */
+            transition: width 0.5s ease; /* Transition width for smooth animation */
+        }
+        #search {
+            /* Existing styles */
+            flex: 1; /* Take remaining space */
+        }
+        .map-overlay.active {
+            width: 500px; /* Expanded width */
+        }
+        .map-overlay input {
+            flex: 1; /* Take remaining space */
+            padding: 9px;
+            font-size: 14px;
+            border: none; /* Remove input border */
+            border-radius: 15px; /* Adjust border radius for curved corners */
+            background-image: url('https://images.vexels.com/media/users/3/132068/isolated/lists/f9bb81e576c1a361c61a8c08945b2c48-search-icon.png');
+            background-size: 20px 20px; /* Set the size of the search icon */
+            background-position: 10px center; /* Position the search icon */
+            background-repeat: no-repeat; /* Prevent icon from repeating */
+            padding-left: 35px; /* Adjust left padding to make space for the icon */
+            margin-bottom: 10px; /* Add margin to separate categories */
+            width: 100%; /* Set input width to 100% */
+            box-sizing: border-box; /* Include padding and border in width calculation */
+            transition: width 0.3s ease; /* Transition width for smooth animation */
+            color: rgb(0, 0, 0);
+            background-color: #f2f2f2;
+        }
+        .categories {
+            width: 100%; /* Set categories width to 100% */
+            margin-top: 10px; /* Add margin to separate search input */
+            display: block; /* Show categories */
+            list-style: none; /* Remove default list styling */
+            padding: 0; /* Remove default padding */
+        }
+        .category {
+            cursor: pointer;
+            padding: 10px 20px;
+            background-color: #f2f2f2;
+            border-radius: 20px;
+            margin-bottom: 10px;
+            transition: background-color 0.3s ease;
+        }
+        .category:hover {
+            background-color: #e0e0e0;
+        }
+        .subcategory {
+            margin-left: 20px;
+            display: none;
+        }
+        .subcategory.active {
+            display: block;
+        }
+        .subcategory li {
+            padding: 5px 20px;
+            transition: background-color 0.3s ease;
+        }
+        .subcategory li:hover {
+            background-color: #e0e0e0;
+        }
+        #resultContent {
+            margin-top: 10px;
+            text-align: center;
+            color: black;
+        }
+        /* Additional styles for the back button */
+        .back-button {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            cursor: pointer;
+            color: green;
+        }
+        .back-button:hover {
+             text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="map-overlay" id="searchOverlay">
+        <form id="searchForm">
+            <label for="from">From:</label>
+            <input type="text" id="from" name="from" placeholder="Choose your departure">
+            <br>
+            <label for="to">To:</label>
+            <input type="text" id="to" name="to" placeholder="Choose your destination">
+            <br>
+            <input type="submit" value="Search">
+        </form>
+        <ul class="categories" id="categories">
+            <li class="category" onclick="selectBuilding('Dormitory Building')">Dormitory Building</li>
+            <li class="category" onclick="selectBuilding('Engineering Laboratory Building')">Engineering Laboratory Building</li>
+            <li class="category" onclick="selectBuilding('Gate-1')">Gate-1</li>
+            <li class="category" onclick="selectBuilding('Gate-2')">Gate-2</li>
+            <li class="category" onclick="selectBuilding('Gate-3')">Gate-3</li>
+            <li class="category" onclick="selectBuilding('Gate-4')">Gate-4</li>
+            <li class="category" onclick="selectBuilding('ITB Building')">ITB Building</li>
+            <li class="category" onclick="selectBuilding('ITC Building')">ITC Building</li>
+            <li class="category" onclick="selectBuilding('MAB Building')">MAB Building</li>
+            <li class="category" onclick="selectBuilding('Medical & Dental Clinic Building')">Medical & Dental Clinic Building</li>
+            <li class="category" onclick="selectBuilding('Old Building')">Old Building</li>
+            <li class="category" onclick="selectBuilding('Old Building(South Wing)')">Old Building (South Wing)</li>
+            <li class="category" onclick="selectBuilding('R&D Building')">R&D Building</li>
+            <li class="category" onclick="selectBuilding('Snagah Building')">Snagah Building</li>
+            <li class="category" onclick="selectBuilding('University Gymnasium')">University Gymnasium</li>
+            <li class="category" onclick="selectBuilding('University Quadrangle')">University Quadrangle</li>
+            <li class="category" onclick="selectBuilding('Wellness Building')">Wellness Building</li>
+        </ul>
+        <!-- Result content -->
+        <div id="resultContent"></div>
+        <div id="backButton" class="back-button" style="display: none;">Back</div>
+    </div>
+    <script>
+        window.onload = function() {
+
+
+         // Function to select a building and set its name in the "From" input field
+    function selectBuilding(buildingName) {
+        // Set the value of the "From" input field to the selected building's name
+        document.getElementById('from').value = buildingName;
+    }
+        // Add event listener to the search form
+        document.getElementById("searchForm").addEventListener("submit", function(event) {
+            event.preventDefault(); // Prevent form submissions
+            // Get the values from the input fields
+            var fromValue = document.getElementById("from").value.toLowerCase(); // Convert to lowercase for case-insensitive comparison
+            var toValue = document.getElementById("to").value.toLowerCase();
+            // Perform processing based on inputs and display the result
+            var result = calculateResult(fromValue, toValue);
+            displayResult(result);
+        });
+    }
+
+
+        // Function to calculate the result
+     // Function to calculate the result
+
+
+        // Function to display the result
+        function displayResult(result) {
+            var resultContent = document.getElementById("resultContent");
+            resultContent.innerHTML = result;
+
+
+
+
+
+
+            // Hide the search form
+            var searchForm = document.getElementById('searchForm');
+            searchForm.style.display = 'none';
+
+
+
+
+            // Show the back button
+            var backButton = document.getElementById('backButton');
+            backButton.style.display = 'block';
+
+
+
+
+            // Hide the categories
+            var categories = document.getElementById('categories');
+            categories.style.display = 'none';
+           
+        }
+
+
+
+
+
+
+        // Add event listener to the back button
+        document.getElementById("backButton").addEventListener("click", function() {
+            var resultContent = document.getElementById("resultContent");
+            resultContent.innerHTML = "";
+            document.getElementById('searchForm').style.display = 'block';
+            document.getElementById('backButton').style.display = 'none';
+            document.getElementById('categories').style.display = 'block';
+        });
+    </script>
+</body>
+</html>
+
+
+
+
